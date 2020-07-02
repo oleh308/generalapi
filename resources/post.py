@@ -86,7 +86,7 @@ class PostsApi(Resource):
             post = Post(**body, author=user)
             post.save()
 
-            if hasattr(request.files, 'file'):
+            if request.files and 'file' in request.files:
                 file = request.files['file']
 
                 filename = 'image' + str(post.id) + '.' + file.filename.rsplit('.', 1)[1].lower()
@@ -117,8 +117,9 @@ class PostApi(Resource):
                 'hashtags': request.form.getlist('hashtags[]')
             }
 
-            file = request.files['file']
-            if file:
+            if request.files and 'file' in request.files:
+                file = request.files['file']
+
                 filename = 'image' + str(post.id) + '.' + file.filename.rsplit('.', 1)[1].lower()
                 if allowed_file(filename):
                     filename = secure_filename(filename)

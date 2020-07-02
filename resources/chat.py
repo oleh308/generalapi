@@ -195,7 +195,6 @@ class MessagesApi(Resource):
 
             message.save()
             chat.save()
-            print('here2')
 
             if 'file[]' in request.files:
                 print('here')
