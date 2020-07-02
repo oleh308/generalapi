@@ -12,9 +12,11 @@ from flask_jwt_extended import (
 
 UPLOAD_FOLDER = join(dirname(realpath(__file__)), 'uploads')
 
+
 app = Flask(__name__)
 app.config.from_envvar('ENV_FILE_LOCATION')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['CSRF_ENABLED'] = True
 
 CORS(app)
 mail = Mail(app)
