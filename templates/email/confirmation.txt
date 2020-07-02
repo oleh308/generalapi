@@ -1,0 +1,9 @@
+Dear, User
+
+To confirm your email click on the following link:
+
+{{ url }}
+
+Sincerely
+
+GeneralAPI Support Team
