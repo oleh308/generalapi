@@ -1,10 +1,12 @@
 import os
 from flask_restful import Resource
 from flask import Response, request
-from database.models import User, Chat, Message
+from database.models import User, Chat, Message, ChatInfo
 from mongoengine.queryset.visitor import Q
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import jwt_required, get_jwt_identity
+
+from app import socketio
 
 from mongoengine.errors import FieldDoesNotExist, \
 NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
@@ -14,7 +16,7 @@ InternalServerError, UpdatingMovieError, DeletingMovieError, MovieNotExistsError
 
 from utils.file import save_file
 from werkzeug.utils import secure_filename
-from utils.convert import convert_chat_basic, convert_chat_full, JSONEncoder
+from utils.convert import convert_chat_basic, convert_chat_full, JSONEncoder, get_last_message
 
 class ChatsApi(Resource):
     @jwt_required
@@ -25,7 +27,7 @@ class ChatsApi(Resource):
             return { 'error': True, 'payload': 'User not found' }, 404
         chats = Chat.objects.filter(Q(host=user) | Q(users__contains=user.id) | Q(admins__contains=user.id))
 
-        chats = [convert_chat_basic(chat) for chat in chats]
+        chats = [convert_chat_basic(chat, user) for chat in chats]
 
         return Response(JSONEncoder().encode(chats), mimetype="application/json", status=200)
 
@@ -41,6 +43,11 @@ class ChatApi(Resource):
             chat = Chat.objects.filter((Q(host=user) | Q(users__contains=user.id) | Q(admins__contains=user.id)) & Q(id=id)).first()
             if not chat:
                 return { 'error': True, 'payload': 'Chat not found' }, 404
+
+            chat_info = ChatInfo.objects(chat=chat, user=user).first()
+            if chat_info:
+                chat_info.message = get_last_message(chat)
+                chat_info.save()
 
             chat = convert_chat_full(chat)
 
@@ -61,6 +68,7 @@ class JoinApi(Resource):
             if not user or not host:
                 return { 'error': True, 'payload': 'User not found' }, 404
 
+            host_chat_info = None
             chat = Chat.objects(host=host, type='public').first()
             if chat:
                 if user not in chat.users and user not in chat.admins and user != chat.host:
@@ -68,8 +76,24 @@ class JoinApi(Resource):
             else:
                 chat = Chat(host=host)
                 chat.users.append(user)
+                host_chat_info = ChatInfo(chat=chat, user=host)
 
+
+            message = Message(type='userJoined', text='', author=user)
+            chat.messages.append(message)
+
+            chat_info = ChatInfo.objects(chat=chat, user=user).first()
+            if not chat_info:
+                chat_info = ChatInfo(chat=chat, user=user)
+
+            chat_info.message = get_last_message(chat)
+
+            message.save()
             chat.save()
+            chat_info.save()
+
+            if host_chat_info:
+                host_chat_info.save()
 
             return { 'id': str(chat.id) }, 200
         except DoesNotExist:
@@ -127,7 +151,7 @@ class RemoveApi(Resource):
             to_remove_name = to_remove.name + ' ' + to_remove.surname
             if user in chat.admins or user == chat.host:
                 chat.users.remove(to_remove)
-                message = Message(type='userRemoved', text='', author=user)
+                message = Message(type='userRemoved', text=to_remove_name, author=user)
                 chat.messages.append(message)
 
                 message.save()
@@ -197,7 +221,6 @@ class MessagesApi(Resource):
             chat.save()
 
             if 'file[]' in request.files:
-                print('here')
                 filenames = []
                 files = request.files.getlist('file[]')
                 for file in files:
@@ -207,6 +230,8 @@ class MessagesApi(Resource):
 
                 message.images = filenames
                 message.save()
+
+            socketio.emit('update', {}, room='chat' + str(chat.id))
 
             return { 'id': str(message.id) }, 200
         except DoesNotExist:

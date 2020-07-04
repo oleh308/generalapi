@@ -9,11 +9,13 @@ from database.db import initialize_db
 from flask_jwt_extended import (
     JWTManager, jwt_required, create_access_token
 )
+from flask_socketio import SocketIO, join_room, leave_room, emit
 
 UPLOAD_FOLDER = join(dirname(realpath(__file__)), 'uploads')
 
-
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 app.config.from_envvar('ENV_FILE_LOCATION')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['CSRF_ENABLED'] = True
@@ -42,3 +44,25 @@ def unauthorized_callback(expired_token):
 
 initialize_db(app)
 initialize_routes(api)
+
+# from app import app
+# from flask_socketio import SocketIO, join_room, leave_room, emit
+#
+# socketio = SocketIO(app, cors_allowed_origins="*")
+#
+# @socketio.on('chat_init')
+# def handle_message(chat):
+#     join_room('chat' + chat['id'])
+#     print('joined chat: ' + 'chat' + chat['id'])
+#
+# @socketio.on('chat_deinit')
+# def handle_message(chat):
+#     leave_room('chat' + chat['id'])
+#     print('left chat: ' + 'chat' + chat['id'])
+#
+# @socketio.on('connect')
+# def connect():
+#     print('Connection init')
+#
+# if __name__ == '__main__':
+#     socketio.run(app, debug=True)

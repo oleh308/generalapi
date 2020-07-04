@@ -23,6 +23,11 @@ class Message(db.Document):
     chat = db.ReferenceField('Chat')
     author = db.ReferenceField('User')
 
+class ChatInfo(db.Document):
+    chat = db.ReferenceField('Chat')
+    user = db.ReferenceField('User')
+    message = db.ReferenceField('Message')
+
 class Chat(db.Document):
     host = db.ReferenceField('User')
     image = db.StringField(default='')
