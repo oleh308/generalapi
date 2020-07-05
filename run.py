@@ -1,6 +1,30 @@
 from app import socketio, app
 from flask_socketio import join_room, leave_room, emit
 
+@socketio.on('timeline_init')
+def handle_message(timeline):
+    for mentor in timeline['mentors']:
+        join_room('mentor' + mentor)
+
+    print('joined timeline: ' + ','.join(timeline['mentors']))
+
+@socketio.on('timeline_deinit')
+def handle_message(timeline):
+    for mentor in timeline['mentors']:
+        leave_room('mentor' + mentor)
+
+    print('left timeline: ' + ','.join(timeline['mentors']))
+
+@socketio.on('post_init')
+def handle_message(post):
+    join_room('post' + post['id'])
+    print('joined post: ' + 'post' + post['id'])
+
+@socketio.on('post_deinit')
+def handle_message(post):
+    leave_room('post' + post['id'])
+    print('left post: ' + 'post' + post['id'])
+
 @socketio.on('chat_init')
 def handle_message(chat):
     join_room('chat' + chat['id'])

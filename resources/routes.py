@@ -2,11 +2,12 @@ from .movie import MoviesApi, MovieApi
 from .interest import InterestsApi, InterestApi
 from .country import CountriesApi, CountryApi
 from .auth import SignupApi, LoginApi, ConfirmApi, SignupMentorApi, LoginMentorApi
-from .user import UserApi, MentorApi, UserImageApi, ImageApi, FollowApi
+from .user import UserApi, MentorApi, UserImageApi, ImageApi, FollowApi, UserProductsApi
 from .reset_password import ForgotPassword, ResetPassword
 from .post import PostsApi, PostApi, CommentApi, LikeApi, RecommendationsApi
 from .search import ResultsApi, SuggestionsApi
-from .chat import ChatsApi, ChatApi, JoinApi, MessagesApi, LeaveApi, PromoteApi, RemoveApi
+from .chat import ChatsApi, ChatApi, JoinPublicApi, JoinPrivateApi, MessagesApi, LeaveApi, PromoteApi, RemoveApi
+from .product import ProductsApi, ProductApi
 
 def initialize_routes(api):
     api.add_resource(FollowApi, '/api/users/follow/<id>')
@@ -36,8 +37,12 @@ def initialize_routes(api):
     api.add_resource(SuggestionsApi, '/api/suggestions/<search>')
     api.add_resource(ChatsApi, '/api/chats')
     api.add_resource(ChatApi, '/api/chats/<id>')
-    api.add_resource(JoinApi, '/api/chats/join/<host_id>')
+    api.add_resource(JoinPublicApi, '/api/chats/public/join/<host_id>')
+    api.add_resource(JoinPrivateApi, '/api/chats/private/join/<host_id>')
     api.add_resource(LeaveApi, '/api/chats/leave/<id>')
     api.add_resource(PromoteApi, '/api/chats/promote/<id>')
     api.add_resource(MessagesApi, '/api/chats/messages/<id>')
     api.add_resource(RemoveApi, '/api/chats/remove/<id>')
+    api.add_resource(ProductsApi, '/api/products')
+    api.add_resource(ProductApi, '/api/products/<id>')
+    api.add_resource(UserProductsApi, '/api/users/<user_id>/products')

@@ -6,7 +6,7 @@ from app import app
 from bson import ObjectId, json_util
 from flask_restful import Resource
 from flask import Response, request, send_from_directory
-from database.models import User, Post, Mentor
+from database.models import User, Post, Mentor, Product
 from bson.json_util import dumps
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -107,6 +107,19 @@ class MentorApi(Resource):
         except Exception:
             raise InternalServerError
 
+
+class UserProductsApi(Resource):
+    @jwt_required
+    def get(self, user_id):
+        try:
+            products = Product.objects(user=user_id)
+            products = [product.to_mongo() for product in products]
+
+            return Response(JSONEncoder().encode(products), mimetype="application/json", status=200)
+        except Exception:
+            raise InternalServerError
+
+
 class UserImageApi(Resource):
     @jwt_required
     def post(self, id):
@@ -139,6 +152,7 @@ class UserImageApi(Resource):
         except Exception:
             raise InternalServerError
 
+
 class FollowApi(Resource):
     @jwt_required
     def post(self, id):
@@ -166,6 +180,7 @@ class FollowApi(Resource):
             raise UpdatingMovieError
         except Exception:
             raise InternalServerError
+
 
 class ImageApi(Resource):
     def get(self, filename):

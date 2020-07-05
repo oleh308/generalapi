@@ -11,6 +11,8 @@ from flask_jwt_extended import jwt_required
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 
+from app import socketio
+
 from mongoengine.errors import FieldDoesNotExist, \
 NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
 
@@ -94,6 +96,8 @@ class PostsApi(Resource):
                     filename = secure_filename(filename)
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     post.update(set__image=filename)
+
+            socketio.emit('update', {}, room='mentor' + str(user.id))
 
             return {'id': str(post.id)}, 200
         except (FieldDoesNotExist, ValidationError):
@@ -180,6 +184,8 @@ class LikeApi(Resource):
 
             if like:
                 like.delete()
+                socketio.emit('update', {}, room='post' + str(post.id))
+
                 return '', 200
             else:
                 body = request.get_json()
@@ -189,8 +195,8 @@ class LikeApi(Resource):
                 post.likes.append(like)
                 post.save()
 
-                print(post.likes)
                 id = like.id
+                socketio.emit('update', {}, room='post' + str(post.id))
 
                 return {'id': str(id)}, 200
         except InvalidQueryError:
@@ -245,8 +251,8 @@ class CommentApi(Resource):
             post.comments.append(comment)
             post.save()
 
-            print(post.comments)
             id = comment.id
+            socketio.emit('update', {}, room='post' + str(post.id))
 
             return {'id': str(id)}, 200
         except InvalidQueryError:

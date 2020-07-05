@@ -8,6 +8,13 @@ class Movie(db.Document):
     genres = db.ListField(db.StringField(), required=True)
     added_by = db.ReferenceField('User')
 
+class Product(db.Document):
+    cost = db.DecimalField(default=1)
+    content = db.StringField(default='')
+    duration = db.DecimalField(default=1)
+    title = db.StringField(required=True, default='')
+    user = db.ReferenceField('User')
+
 class Topic(db.Document):
     content = db.StringField(default='')
     title = db.StringField(required=True, default='')
@@ -29,6 +36,7 @@ class ChatInfo(db.Document):
     message = db.ReferenceField('Message')
 
 class Chat(db.Document):
+    expires_at = db.DateTimeField()
     host = db.ReferenceField('User')
     image = db.StringField(default='')
     capacity = db.DecimalField(default=-1)
@@ -88,6 +96,7 @@ class User(db.Document):
     mentor = db.ReferenceField('Mentor', reverse_delete_rule=db.CASCADE)
     following = db.ListField(db.ReferenceField('User'), default=[])
     followers = db.ListField(db.ReferenceField('User'), default=[])
+    products = db.ListField(db.ReferenceField('Product', reverse_delete_rule=db.PULL))
     posts = db.ListField(db.ReferenceField('Post', reverse_delete_rule=db.PULL))
     recent_searches = db.ListField(db.StringField(), default=[])
 #    movies = db.ListField(db.ReferenceField('Movie', reverse_delete_rule=db.PULL))
@@ -100,6 +109,7 @@ class User(db.Document):
 
 User.register_delete_rule(Post, 'author', db.CASCADE)
 User.register_delete_rule(Comment, 'author', db.CASCADE)
+User.register_delete_rule(Product, 'user', db.CASCADE)
 Post.register_delete_rule(Comment, 'post', db.CASCADE)
 Post.register_delete_rule(Like, 'post', db.CASCADE)
 Chat.register_delete_rule(Message, 'chat', db.CASCADE)

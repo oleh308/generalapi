@@ -15,6 +15,7 @@ flask-mail = "*"
 eventlet = "*"
 flask-socketio = "*"
 flask-cors = "*"
+timestring = "*"
 
 [requires]
 python_version = "3.6"

@@ -1,4 +1,5 @@
 import os
+import timestring
 from flask_restful import Resource
 from flask import Response, request
 from database.models import User, Chat, Message, ChatInfo
@@ -57,7 +58,7 @@ class ChatApi(Resource):
             raise InternalServerError
 
 
-class JoinApi(Resource):
+class JoinPublicApi(Resource):
     @jwt_required
     def post(self, host_id):
         try:
@@ -100,6 +101,40 @@ class JoinApi(Resource):
             raise DocumentMissing
         except Exception as e:
             raise InternalServerError
+
+
+class JoinPrivateApi(Resource):
+    @jwt_required
+    def post(self, host_id):
+        try:
+            body = request.get_json()
+            user_id = get_jwt_identity()
+            user = User.objects.get(id=user_id)
+            host = User.objects.get(id=host_id)
+
+            host_chat_info = None
+            chat = Chat.objects.filter(Q(host=host) & Q(users__contains=user.id) & Q(type='prviate')).first()
+
+            if chat:
+                return '', 400
+            else:
+                chat = Chat(host=host, expires_at=timestring.Date(body['date']).date, type='private')
+                chat.users.append(user)
+                host_chat_info = ChatInfo(chat=chat, user=host)
+                user_chat_info = ChatInfo(chat=chat, user=user)
+
+                chat.save()
+                host_chat_info.save()
+                user_chat_info.save()
+
+                return { 'id': str(chat.id) }, 200
+        except ValidationError:
+            raise SchemaValidationError
+        except DoesNotExist:
+            raise DocumentMissing
+        except Exception as e:
+            raise InternalServerError
+
 
 class LeaveApi(Resource):
     @jwt_required
