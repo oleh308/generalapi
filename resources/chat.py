@@ -1,23 +1,17 @@
-import os
 import timestring
+from app import socketio
+from utils.file import save_file
 from flask_restful import Resource
 from flask import Response, request
-from database.models import User, Chat, Message, ChatInfo
 from mongoengine.queryset.visitor import Q
-from flask_jwt_extended import jwt_required
+from database.models import User, Chat, Message, ChatInfo
 from flask_jwt_extended import jwt_required, get_jwt_identity
-
-from app import socketio
+from utils.convert import convert_chat_basic, convert_chat_full, JSONEncoder, get_last_message
 
 from mongoengine.errors import FieldDoesNotExist, \
-NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
+    NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
+from resources.errors import SchemaValidationError, InternalServerError, DocumentMissing
 
-from resources.errors import SchemaValidationError, MovieAlreadyExistsError, \
-InternalServerError, UpdatingMovieError, DeletingMovieError, MovieNotExistsError, DocumentMissing
-
-from utils.file import save_file
-from werkzeug.utils import secure_filename
-from utils.convert import convert_chat_basic, convert_chat_full, JSONEncoder, get_last_message
 
 class ChatsApi(Resource):
     @jwt_required
@@ -39,9 +33,8 @@ class ChatApi(Resource):
         try:
             user_id = get_jwt_identity()
             user = User.objects.get(id=user_id)
-            if not user:
-                return { 'error': True, 'payload': 'User not found' }, 404
             chat = Chat.objects.filter((Q(host=user) | Q(users__contains=user.id) | Q(admins__contains=user.id)) & Q(id=id)).first()
+
             if not chat:
                 return { 'error': True, 'payload': 'Chat not found' }, 404
 
@@ -53,7 +46,8 @@ class ChatApi(Resource):
             chat = convert_chat_full(chat)
 
             return Response(JSONEncoder().encode(chat), mimetype="application/json", status=200)
-
+        except DoesNotExist:
+            raise DocumentMissing
         except Exception as e:
             raise InternalServerError
 
@@ -65,9 +59,6 @@ class JoinPublicApi(Resource):
             user_id = get_jwt_identity()
             user = User.objects.get(id=user_id)
             host = User.objects.get(id=host_id)
-
-            if not user or not host:
-                return { 'error': True, 'payload': 'User not found' }, 404
 
             host_chat_info = None
             chat = Chat.objects(host=host, type='public').first()
