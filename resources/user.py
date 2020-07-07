@@ -1,56 +1,14 @@
-import os
-import json
 import operator
-import datetime
 from app import app
-from bson import ObjectId, json_util
 from flask_restful import Resource
-from flask import Response, request, send_from_directory
+from flask import Response, request
+from utils.convert import JSONEncoder, convert_post
 from database.models import User, Post, Mentor, Product
-from bson.json_util import dumps
-from flask_jwt_extended import jwt_required
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from werkzeug.utils import secure_filename
 
-from mongoengine.errors import FieldDoesNotExist, \
-NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
-
-from resources.errors import SchemaValidationError, MovieAlreadyExistsError, \
-InternalServerError, UpdatingMovieError, DeletingMovieError, MovieNotExistsError
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def convert_post(post):
-    data = post.to_mongo()
-
-    if post.comments:
-        data['comments'] = [convert_ob(ob) for ob in post.comments]
-    if post.likes:
-        data['likes'] = [convert_ob(ob) for ob in post.likes]
-    if post.author:
-        data['author'] = User.objects.only('name', 'surname', 'image').get(id=post.author.id).to_mongo()
-
-    return data
-
-def convert_ob(ob):
-    author = User.objects.only('name', 'surname', 'image', 'confirmed_at').get(id=ob.author.id).to_mongo()
-
-    ob = ob.to_mongo()
-    ob['author'] = author
-
-    return ob
-
-class JSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, ObjectId):
-            return str(o)
-        if isinstance(o, datetime.datetime):
-            return o.isoformat()
-        return json.JSONEncoder.default(self, o)
+from mongoengine.errors import DoesNotExist, ValidationError, InvalidQueryError
+from resources.errors import SchemaValidationError, \
+    InternalServerError, DocumentMissing
 
 class UserApi(Resource):
     @jwt_required
@@ -63,11 +21,11 @@ class UserApi(Resource):
             user = User.objects.get(id=id)
             body = request.get_json()
             User.objects.get(id=id).update(**body)
-            return { 'success': True }, 200
+            return '', 200
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
-            raise UpdatingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
 
@@ -77,13 +35,15 @@ class UserApi(Resource):
             user_id = get_jwt_identity()
             user = User.objects.exclude('password').get(id=id)
             data = user.to_mongo()
+
             if user.mentor:
                 data['mentor'] = user.mentor.to_mongo()
                 data['posts'] = [convert_post(ob) for ob in Post.objects.filter(author=id)]
                 data['posts'].sort(key=operator.itemgetter('created_at'), reverse=True)
+
             return Response(JSONEncoder().encode(data), mimetype="application/json", status=200)
         except DoesNotExist:
-            raise MovieNotExistsError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
 
@@ -99,11 +59,12 @@ class MentorApi(Resource):
             user = User.objects.get(id=id)
             body = request.get_json()
             user.mentor.update(**body)
-            return { 'success': True }, 200
+
+            return '', 200
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
-            raise UpdatingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
 
@@ -135,20 +96,20 @@ class UserImageApi(Resource):
             file = request.files['file']
             user = User.objects.get(id=id)
 
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                body = {
-                    'image': filename
-                }
-                user.update(**body)
-                return { 'success': True, 'image': filename }, 200
+            if 'file' in request.files:
+                file = request.files['file']
+                filename = str(user.id) + file.filename
+
+                if save_file(filename, file):
+                    user.update(image=filename)
+
+                return { 'image': filename }, 200
             else:
                 return { 'error': True, 'payload': 'Something went wrong' }, 400
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
-            raise UpdatingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
 
@@ -177,11 +138,6 @@ class FollowApi(Resource):
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
-            raise UpdatingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
-
-
-class ImageApi(Resource):
-    def get(self, filename):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
