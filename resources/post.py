@@ -1,78 +1,36 @@
-import os
-import json
 import operator
-import datetime
-from app import app
-from bson import json_util, ObjectId
+from app import app, socketio
+from utils.file import save_file
 from flask_restful import Resource
 from flask import Response, request
+from utils.convert import JSONEncoder, convert_post
 from database.models import User, Post, Comment, Like
-from flask_jwt_extended import jwt_required
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from werkzeug.utils import secure_filename
-
-from app import socketio
 
 from mongoengine.errors import FieldDoesNotExist, \
-NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
+    DoesNotExist, ValidationError, InvalidQueryError
 
-from resources.errors import SchemaValidationError, MovieAlreadyExistsError, \
-InternalServerError, UpdatingMovieError, DeletingMovieError, MovieNotExistsError
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def convert_post(post):
-    author = post.author.to_mongo()
-    likes = [convert_ob(ob) for ob in post.likes]
-    post = post.to_mongo()
-    author = {
-        'name': author['name'],
-        'id': str(author['_id']),
-        'surname': author['surname'],
-        'image': author['image']
-    }
-    post['_id'] = str(post['_id'])
-    post['author'] = author
-    post['likes'] = likes
-    post['created_at'] = post['created_at'].isoformat()
-
-    return post
-
-def convert_ob(ob):
-    author = User.objects.only('name', 'surname', 'image', 'confirmed_at').get(id=ob.author.id).to_mongo()
-
-    ob = ob.to_mongo()
-    ob['author'] = author
-
-    return ob
-
-class JSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, ObjectId):
-            return str(o)
-        if isinstance(o, datetime.datetime):
-            return o.isoformat()
-        return json.JSONEncoder.default(self, o)
+from resources.errors import SchemaValidationError, InternalServerError
 
 class PostsApi(Resource):
     @jwt_required
     def get(self):
-        user_id = get_jwt_identity()
-        user = User.objects.get(id=user_id)
-        if not user:
-            return { 'error': True, 'payload': 'User not found' }, 404
+        try:
+            user_id = get_jwt_identity()
+            user = User.objects.get(id=user_id)
 
-        ids = user.following
-        ids.append(user)
+            ids = user.following
+            ids.append(user)
 
-        posts = Post.objects(author__in=ids)
-        posts = [convert_post(ob) for ob in posts]
-        posts.sort(key=operator.itemgetter('created_at'), reverse=True)
-        return Response(JSONEncoder().encode(posts), mimetype="application/json", status=200)
+            posts = Post.objects(author__in=ids)
+            posts = [convert_post(ob) for ob in posts]
+            posts.sort(key=operator.itemgetter('created_at'), reverse=True)
+
+            return Response(JSONEncoder().encode(posts), mimetype="application/json", status=200)
+        except DoesNotExist:
+            raise DocumentMissing
+        except Exception as e:
+            raise InternalServerError
 
     @jwt_required
     def post(self):
@@ -90,11 +48,9 @@ class PostsApi(Resource):
 
             if request.files and 'file' in request.files:
                 file = request.files['file']
+                filename = str(post.id) + file.filename
 
-                filename = 'image' + str(post.id) + '.' + file.filename.rsplit('.', 1)[1].lower()
-                if allowed_file(filename):
-                    filename = secure_filename(filename)
-                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                if save_file(filename, file):
                     post.update(set__image=filename)
 
             socketio.emit('update', {}, room='mentor' + str(user.id))
@@ -102,8 +58,8 @@ class PostsApi(Resource):
             return {'id': str(post.id)}, 200
         except (FieldDoesNotExist, ValidationError):
             raise SchemaValidationError
-        except NotUniqueError:
-            raise MovieAlreadyExistsError
+        except DoesNotExist:
+            raise DocumentMissing
         except Exception as e:
             raise InternalServerError
 
@@ -112,9 +68,6 @@ class PostApi(Resource):
     def put(self, id):
         try:
             post = Post.objects.get(id=id)
-            if not post:
-                return { 'error': True, 'payload': 'Post not found' }, 404
-
             body = {
                 'title': request.form['title'],
                 'content': request.form['content'],
@@ -123,11 +76,9 @@ class PostApi(Resource):
 
             if request.files and 'file' in request.files:
                 file = request.files['file']
+                filename = str(post.id) + file.filename
 
-                filename = 'image' + str(post.id) + '.' + file.filename.rsplit('.', 1)[1].lower()
-                if allowed_file(filename):
-                    filename = secure_filename(filename)
-                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                if save_file(filename, file):
                     body['image'] = filename
 
             post.update(**body)
@@ -135,7 +86,7 @@ class PostApi(Resource):
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
-            raise UpdatingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
 
@@ -146,7 +97,7 @@ class PostApi(Resource):
             post.delete()
             return '', 200
         except DoesNotExist:
-            raise DeletingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
 
@@ -154,19 +105,12 @@ class PostApi(Resource):
     def get(self, id):
         try:
             post = Post.objects.get(id=id)
-            comments = Comment.objects(post=post)
-            data = post.to_mongo()
-            if post.comments:
-                data['comments'] = [convert_ob(ob) for ob in post.comments]
-            if post.likes:
-                data['likes'] = [convert_ob(ob) for ob in post.likes]
-            if post.author:
-                data['author'] = User.objects.only('name', 'surname', 'image').get(id=post.author.id).to_mongo()
-            return Response(JSONEncoder().encode(data), mimetype="application/json", status=200)
+            return Response(convert_post(post), mimetype="application/json", status=200)
         except DoesNotExist:
-            raise MovieNotExistsError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
+
 
 class LikeApi(Resource):
     @jwt_required
@@ -175,8 +119,6 @@ class LikeApi(Resource):
             user_id = get_jwt_identity()
             post = Post.objects.get(id=post_id)
             user = User.objects.get(id=user_id)
-            if not user or not post:
-                return { 'error': True, 'payload': 'User not found' }, 404
 
             like = None
             if Like and Like.objects:
@@ -202,9 +144,10 @@ class LikeApi(Resource):
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
-            raise UpdatingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
+
 
 class RecommendationsApi(Resource):
     @jwt_required
@@ -212,8 +155,6 @@ class RecommendationsApi(Resource):
         try:
             user_id = get_jwt_identity()
             user = User.objects.get(id=user_id)
-            if not user:
-                return { 'error': True, 'payload': 'User not found' }, 404
 
             ids = user.following
             ids.append(user)
@@ -225,11 +166,12 @@ class RecommendationsApi(Resource):
 
             posts = [convert_post(ob) for ob in posts]
             posts.sort(key=operator.itemgetter('created_at'), reverse=True)
+
             return Response(JSONEncoder().encode(posts), mimetype="application/json", status=200)
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
-            raise UpdatingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
 
@@ -240,10 +182,7 @@ class CommentApi(Resource):
             user_id = get_jwt_identity()
             post = Post.objects.get(id=post_id)
             user = User.objects.get(id=user_id)
-            if not user or not post:
-                return { 'error': True, 'payload': 'User or post not found' }, 404
 
-            print(post, user.posts)
             body = request.get_json()
             comment = Comment(**body, post=post, author=user)
             comment.save()
@@ -258,32 +197,20 @@ class CommentApi(Resource):
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
-            raise UpdatingMovieError
+            raise DocumentMissing
         except Exception:
             raise InternalServerError
 
-    # @jwt_required
-    # def delete(self, id):
-    #     try:
-    #         post = Post.objects.get(id=id)
-    #         post.delete()
-    #         return '', 200
-    #     except DoesNotExist:
-    #         raise DeletingMovieError
-    #     except Exception:
-    #         raise InternalServerError
-    #
-    # @jwt_required
-    # def get(self, id):
-    #     try:
-    #         post = Post.objects.get(id=id)
-    #         data = post.to_mongo()
-    #         if post.comments:
-    #             data['comments'] = [convert_comment(ob) for ob in post.comments]
-    #         if post.author:
-    #             data['author'] = User.objects.only('name', 'surname', 'image').get(id=post.author.id).to_mongo()
-    #         return Response(JSONEncoder().encode(data), mimetype="application/json", status=200)
-    #     except DoesNotExist:
-    #         raise MovieNotExistsError
-    #     except Exception:
-    #         raise InternalServerError
+    @jwt_required
+    def delete(self, id):
+        try:
+            user_id = get_jwt_identity()
+            user = User.objects.get(id=user_id)
+            comment = Comment.objects.get(id=id, author=user)
+            comment.delete()
+
+            return '', 200
+        except DoesNotExist:
+            raise DocumentMissing
+        except Exception:
+            raise InternalServerError

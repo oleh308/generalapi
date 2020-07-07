@@ -1,5 +1,6 @@
 import operator
 from app import app
+from utils.file import save_file
 from flask_restful import Resource
 from flask import Response, request
 from utils.convert import JSONEncoder, convert_post
@@ -96,7 +97,7 @@ class UserImageApi(Resource):
             file = request.files['file']
             user = User.objects.get(id=id)
 
-            if 'file' in request.files:
+            if request.files and 'file' in request.files:
                 file = request.files['file']
                 filename = str(user.id) + file.filename
 
