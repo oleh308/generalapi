@@ -1,9 +1,9 @@
 import datetime
 from app import app
-from database.models import User, Mentor
 from flask_restful import Resource
-from flask import Response, request, render_template
+from database.models import User, Mentor
 from services.mail_service import send_email
+from flask import Response, request, render_template
 from flask_jwt_extended import create_access_token, decode_token
 from mongoengine.errors import FieldDoesNotExist, NotUniqueError, DoesNotExist, ValidationError
 from resources.errors import SchemaValidationError, EmailAlreadyExistsError, UnauthorizedError, InternalServerError
@@ -138,42 +138,6 @@ class LoginApi(Resource):
                 return_ob['is_mentor'] = True
 
             return return_ob, 200
-        except (UnauthorizedError, DoesNotExist):
-            raise UnauthorizedError
-        except Exception as e:
-            raise InternalServerError
-
-
-class LoginMentorApi(Resource):
-    def post(self):
-        try:
-            body = request.get_json()
-            user = User.objects.get(email=body.get('email'))
-
-            authorized = user.check_password(body.get('password'))
-            if not authorized:
-                return {'error': 'Email or password invalid', 'type': 'notValid'}, 401
-
-            if not user.confirmed:
-                return {'error': 'Email is not confirmed', 'type': 'confirmationRequired'}, 401
-
-            if not user.mentor:
-                return {'error': 'User is not a mentor', 'type': 'isNotMentor'}, 401
-
-            if user.mentor.status == 'pending':
-                return {'error': "Mentor's status is spending", 'type': 'mentorIsPending'}, 401
-
-            if user.mentor.status == 'cancelled':
-                return {'error': 'Mentor was not approved', 'type': 'mentorIsNotApproved'}, 401
-
-            prev_login = user.first_login
-            if user.first_login:
-                user.modify(first_login=False)
-                user.save()
-
-            expires = datetime.timedelta(days=7)
-            access_token = create_access_token(identity=str(user.id), expires_delta=expires)
-            return {'token': access_token, 'user_id': str(user.id), 'first_login': prev_login}, 200
         except (UnauthorizedError, DoesNotExist):
             raise UnauthorizedError
         except Exception as e:

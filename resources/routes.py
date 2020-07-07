@@ -1,13 +1,14 @@
 from .movie import MoviesApi, MovieApi
 from .interest import InterestsApi, InterestApi
 from .country import CountriesApi, CountryApi
-from .auth import SignupApi, LoginApi, ConfirmApi, SignupMentorApi, LoginMentorApi
-from .user import UserApi, MentorApi, UserImageApi, ImageApi, FollowApi, UserProductsApi
+from .auth import SignupApi, LoginApi, ConfirmApi, SignupMentorApi
+from .user import UserApi, MentorApi, UserImageApi, FollowApi, UserProductsApi
 from .reset_password import ForgotPassword, ResetPassword
 from .post import PostsApi, PostApi, CommentApi, LikeApi, RecommendationsApi
 from .search import ResultsApi, SuggestionsApi
 from .chat import ChatsApi, ChatApi, JoinPublicApi, JoinPrivateApi, MessagesApi, LeaveApi, PromoteApi, RemoveApi
 from .product import ProductsApi, ProductApi
+from .files import ImageApi
 
 def initialize_routes(api):
     api.add_resource(FollowApi, '/api/users/follow/<id>')
@@ -16,7 +17,6 @@ def initialize_routes(api):
     api.add_resource(SignupApi, '/api/auth/signup')
     api.add_resource(SignupMentorApi, '/api/auth/mentor/signup')
     api.add_resource(LoginApi, '/api/auth/login')
-    api.add_resource(LoginMentorApi, '/api/auth/mentor/login')
     api.add_resource(UserImageApi, '/api/user/image/<id>')
     api.add_resource(ImageApi, '/api/image/<filename>')
     api.add_resource(UserApi, '/api/user/<id>')

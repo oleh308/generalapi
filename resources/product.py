@@ -1,12 +1,12 @@
 from flask_restful import Resource
 from flask import Response, request
+from utils.convert import JSONEncoder
 from database.models import User, Product
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from mongoengine.errors import DoesNotExist, ValidationError
 from resources.errors import InternalServerError, SchemaValidationError, DocumentMissing
 
-from utils.convert import JSONEncoder
 
 class ProductsApi(Resource):
     @jwt_required
@@ -45,23 +45,6 @@ class ProductsApi(Resource):
         except Exception as e:
             raise InternalServerError
 
-
-# class UserProductsApi(Resource):
-#     @jwt_required
-#     def get(self, user_id):
-#         try:
-#             body = request.get_json()
-#
-#             user = User.objects.get(id=user_id)
-#             products = Product.objects(user=user)
-#             products = [product.to_mongo() for product in products]
-#
-#             return Response(JSONEncoder().encode(products), mimetype="application/json", status=200)
-#         except DoesNotExist:
-#             raise DocumentMissing
-#         except Exception as e:
-#             raise InternalServerError
-#
 
 class ProductApi(Resource):
     @jwt_required

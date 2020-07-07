@@ -22,7 +22,7 @@ app.config['CSRF_ENABLED'] = True
 
 CORS(app)
 mail = Mail(app)
-from resources.routes import initialize_routes
+from routes import initialize_routes
 
 api = Api(app, errors=errors)
 bcrypt = Bcrypt(app)

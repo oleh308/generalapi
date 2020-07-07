@@ -2,7 +2,7 @@ import json
 import datetime
 from bson import json_util, ObjectId
 
-from database.models import User, Message, ChatInfo
+from database.models import User, Message, ChatInfo, Mentor
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -63,6 +63,28 @@ def convert_chat_full(chat):
 
     return data
 
+def convert_ob(ob):
+    author = get_user_basic(User.objects.get(id=ob.author.id))
+
+    ob = ob.to_mongo()
+    ob['author'] = author
+
+    return ob
+
+def convert_post(post):
+    data = post.to_mongo()
+
+    if post.comments:
+        data['comments'] = [convert_ob(ob) for ob in post.comments]
+    if post.likes:
+        data['likes'] = [convert_ob(ob) for ob in post.likes]
+    if post.author:
+        data['author'] = get_user_basic(User.objects.get(id=post.author.id))
+
+    data['created_at'] = data['created_at'].isoformat()
+
+    return data
+
 def get_user_basic(user):
     data = {
         '_id': user.id,
@@ -72,3 +94,11 @@ def get_user_basic(user):
     }
 
     return data
+
+def convert_user(user):
+    mentor = Mentor.objects.get(id=user.mentor.id).to_mongo()
+
+    user = user.to_mongo()
+    user['mentor'] = mentor
+
+    return user

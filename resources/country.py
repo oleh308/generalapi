@@ -4,7 +4,7 @@ from database.models import User, Country
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from mongoengine.errors import FieldDoesNotExist, \
-NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
+    NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
 from resources.errors import SchemaValidationError, InternalServerError, DocumentMissing
 
 
