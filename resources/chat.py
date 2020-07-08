@@ -4,9 +4,9 @@ from utils.file import save_file
 from flask_restful import Resource
 from flask import Response, request
 from mongoengine.queryset.visitor import Q
-from database.models import User, Chat, Message, ChatInfo
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from utils.convert import convert_chat_basic, convert_chat_full, JSONEncoder, get_last_message
+from database.models import User, Chat, Message, ChatInfo, Product, Session
+from utils.convert import convert_chat_basic, convert_chat_full, JSONEncoder, get_last_message, convert_session
 
 from mongoengine.errors import FieldDoesNotExist, \
     NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
@@ -38,12 +38,14 @@ class ChatApi(Resource):
             if not chat:
                 return { 'error': True, 'payload': 'Chat not found' }, 404
 
+            product = chat.product
             chat_info = ChatInfo.objects(chat=chat, user=user).first()
             if chat_info:
                 chat_info.message = get_last_message(chat)
                 chat_info.save()
 
             chat = convert_chat_full(chat)
+            chat['product'] = product.to_mongo()
 
             return Response(JSONEncoder().encode(chat), mimetype="application/json", status=200)
         except DoesNotExist:
@@ -51,6 +53,22 @@ class ChatApi(Resource):
         except Exception as e:
             raise InternalServerError
 
+class ChatSessionsApi(Resource):
+    @jwt_required
+    def get(self, id):
+        try:
+            user_id = get_jwt_identity()
+            user = User.objects.get(id=user_id)
+            chat = Chat.objects.get(id=id)
+
+            sessions = Session.objects.filter(chat=chat)
+            sessions = [convert_session(session) for session in sessions]
+
+            return Response(JSONEncoder().encode(sessions), mimetype="application/json", status=200)
+        except DoesNotExist:
+            raise DocumentMissing
+        except Exception as e:
+            raise InternalServerError
 
 class JoinPublicApi(Resource):
     @jwt_required
@@ -102,6 +120,7 @@ class JoinPrivateApi(Resource):
             user_id = get_jwt_identity()
             user = User.objects.get(id=user_id)
             host = User.objects.get(id=host_id)
+            product = Product.objects.get(id=body['product_id'])
 
             host_chat_info = None
             chat = Chat.objects.filter(Q(host=host) & Q(users__contains=user.id) & Q(type='prviate')).first()
@@ -109,7 +128,7 @@ class JoinPrivateApi(Resource):
             if chat:
                 return '', 400
             else:
-                chat = Chat(host=host, expires_at=timestring.Date(body['date']).date, type='private')
+                chat = Chat(host=host, product=product, type='private')
                 chat.users.append(user)
                 host_chat_info = ChatInfo(chat=chat, user=host)
                 user_chat_info = ChatInfo(chat=chat, user=user)

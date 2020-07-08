@@ -1,5 +1,5 @@
 from resources.chat import ChatsApi, ChatApi, JoinPublicApi, \
-    JoinPrivateApi, MessagesApi, LeaveApi, PromoteApi, RemoveApi
+    JoinPrivateApi, MessagesApi, LeaveApi, PromoteApi, RemoveApi, ChatSessionsApi
 
 def chats_routes(api):
     api.add_resource(ChatsApi, '/api/chats')
@@ -10,3 +10,4 @@ def chats_routes(api):
     api.add_resource(PromoteApi, '/api/chats/promote/<id>')
     api.add_resource(MessagesApi, '/api/chats/messages/<id>')
     api.add_resource(RemoveApi, '/api/chats/remove/<id>')
+    api.add_resource(ChatSessionsApi, '/api/chats/<id>/sessions')

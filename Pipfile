@@ -16,6 +16,7 @@ eventlet = "*"
 flask-socketio = "*"
 flask-cors = "*"
 timestring = "*"
+python-dateutil = "*"
 
 [requires]
 python_version = "3.6"

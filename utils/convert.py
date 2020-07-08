@@ -71,6 +71,14 @@ def convert_ob(ob):
 
     return ob
 
+def convert_session(session):
+    data = session.to_mongo()
+
+    data['user'] = get_user_basic(session.user)
+    data['mentor'] = get_user_basic(session.mentor)
+
+    return data
+
 def convert_post(post):
     data = post.to_mongo()
 

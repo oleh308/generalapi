@@ -7,5 +7,5 @@ def users_routes(api):
     api.add_resource(FollowApi, '/api/users/follow/<id>')
     # FRONT END UPDATE
     api.add_resource(UserImageApi, '/api/users/image/<id>')
-    api.add_resource(MentorApi, '/api/users/mentor/<mentor_id>')
+    api.add_resource(MentorApi, '/api/users/<id>/mentor')
     api.add_resource(UserProductsApi, '/api/users/<user_id>/products')

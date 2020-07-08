@@ -9,7 +9,6 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from mongoengine.errors import FieldDoesNotExist, \
     DoesNotExist, ValidationError, InvalidQueryError
-
 from resources.errors import SchemaValidationError, InternalServerError
 
 class PostsApi(Resource):
@@ -104,8 +103,9 @@ class PostApi(Resource):
     @jwt_required
     def get(self, id):
         try:
+            print('here fetching posts', id)
             post = Post.objects.get(id=id)
-            return Response(convert_post(post), mimetype="application/json", status=200)
+            return Response(JSONEncoder().encode(convert_post(post)), mimetype="application/json", status=200)
         except DoesNotExist:
             raise DocumentMissing
         except Exception:

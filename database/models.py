@@ -11,9 +11,19 @@ class Movie(db.Document):
 class Product(db.Document):
     cost = db.DecimalField(default=1)
     content = db.StringField(default='')
-    duration = db.DecimalField(default=1)
+    amount = db.DecimalField(default=1)
     title = db.StringField(required=True, default='')
     user = db.ReferenceField('User')
+
+class Session(db.Document):
+    comment = db.StringField(default='')
+    status = db.StringField(required=True)
+    end_date = db.StringField(required=True)
+    start_date = db.StringField(required=True)
+    created_at = db.DateTimeField(default=datetime.datetime.now)
+    user = db.ReferenceField('User', required=True)
+    chat = db.ReferenceField('Chat', required=True)
+    mentor = db.ReferenceField('User', required=True)
 
 class Topic(db.Document):
     content = db.StringField(default='')
@@ -36,11 +46,11 @@ class ChatInfo(db.Document):
     message = db.ReferenceField('Message')
 
 class Chat(db.Document):
-    expires_at = db.DateTimeField()
     host = db.ReferenceField('User')
     image = db.StringField(default='')
     capacity = db.DecimalField(default=-1)
     type = db.StringField(default='public')
+    product = db.ReferenceField('Product', default=None)
     users = db.ListField(db.ReferenceField('User'), default=[])
     admins = db.ListField(db.ReferenceField('User'), default=[])
     created_at = db.DateTimeField(default=datetime.datetime.now)

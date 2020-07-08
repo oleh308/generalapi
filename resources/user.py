@@ -4,7 +4,7 @@ from utils.file import save_file
 from flask_restful import Resource
 from flask import Response, request
 from utils.convert import JSONEncoder, convert_post
-from database.models import User, Post, Mentor, Product
+from database.models import User, Post, Mentor, Product, Chat
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from mongoengine.errors import DoesNotExist, ValidationError, InvalidQueryError
@@ -35,12 +35,18 @@ class UserApi(Resource):
         try:
             user_id = get_jwt_identity()
             user = User.objects.exclude('password').get(id=id)
+            chat = Chat.objects.filter(type='public').first()
+            clients = Chat.objects.filter(type='private')
             data = user.to_mongo()
 
             if user.mentor:
                 data['mentor'] = user.mentor.to_mongo()
                 data['posts'] = [convert_post(ob) for ob in Post.objects.filter(author=id)]
                 data['posts'].sort(key=operator.itemgetter('created_at'), reverse=True)
+
+                if chat:
+                    data['chat_users'] = len(chat.admins) + len(chat.users)
+                    data['clients'] = len(clients)
 
             return Response(JSONEncoder().encode(data), mimetype="application/json", status=200)
         except DoesNotExist:
