@@ -103,7 +103,6 @@ class PostApi(Resource):
     @jwt_required
     def get(self, id):
         try:
-            print('here fetching posts', id)
             post = Post.objects.get(id=id)
             return Response(JSONEncoder().encode(convert_post(post)), mimetype="application/json", status=200)
         except DoesNotExist:
