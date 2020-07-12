@@ -74,8 +74,17 @@ def convert_ob(ob):
 def convert_session(session):
     data = session.to_mongo()
 
-    data['user'] = get_user_basic(session.user)
-    data['mentor'] = get_user_basic(session.mentor)
+    data['slot'] = session.slot.to_mongo()
+    data['host'] = get_user_basic(session.host)
+
+    return data
+
+def convert_session_chat(session, chat):
+    data = session.to_mongo()
+
+    data['slot'] = session.slot.to_mongo()
+    data['host'] = get_user_basic(session.host)
+    data['chat'] = str(chat.id)
 
     return data
 
@@ -90,6 +99,16 @@ def convert_post(post):
         data['author'] = get_user_basic(User.objects.get(id=post.author.id))
 
     data['created_at'] = data['created_at'].isoformat()
+
+    return data
+
+def convert_product(product):
+    data = product.to_mongo()
+
+    days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    for day in days:
+        key = day + '_slots'
+        data[key] = [slot.to_mongo() for slot in product[key]]
 
     return data
 

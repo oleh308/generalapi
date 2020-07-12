@@ -5,8 +5,8 @@ from flask_restful import Resource
 from flask import Response, request
 from mongoengine.queryset.visitor import Q
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from database.models import User, Chat, Message, ChatInfo, Product, Session
-from utils.convert import convert_chat_basic, convert_chat_full, JSONEncoder, get_last_message, convert_session
+from database.models import User, Chat, Message, ChatInfo, Product, Session, ToDoAction
+from utils.convert import convert_chat_basic, convert_chat_full, JSONEncoder, get_last_message, convert_session, convert_ob
 
 from mongoengine.errors import FieldDoesNotExist, \
     NotUniqueError, DoesNotExist, ValidationError, InvalidQueryError
@@ -45,7 +45,8 @@ class ChatApi(Resource):
                 chat_info.save()
 
             chat = convert_chat_full(chat)
-            chat['product'] = product.to_mongo()
+            if 'product' in chat:
+                chat['product'] = product.to_mongo()
 
             return Response(JSONEncoder().encode(chat), mimetype="application/json", status=200)
         except DoesNotExist:
@@ -53,15 +54,14 @@ class ChatApi(Resource):
         except Exception as e:
             raise InternalServerError
 
+
 class ChatSessionsApi(Resource):
     @jwt_required
     def get(self, id):
         try:
             user_id = get_jwt_identity()
-            user = User.objects.get(id=user_id)
-            chat = Chat.objects.get(id=id)
 
-            sessions = Session.objects.filter(chat=chat)
+            sessions = Session.objects.filter(chats__contains=id)
             sessions = [convert_session(session) for session in sessions]
 
             return Response(JSONEncoder().encode(sessions), mimetype="application/json", status=200)
@@ -69,6 +69,7 @@ class ChatSessionsApi(Resource):
             raise DocumentMissing
         except Exception as e:
             raise InternalServerError
+
 
 class JoinPublicApi(Resource):
     @jwt_required
@@ -179,6 +180,7 @@ class LeaveApi(Resource):
         except Exception as e:
             raise InternalServerError
 
+
 class RemoveApi(Resource):
     @jwt_required
     def post(self, id):
@@ -279,6 +281,76 @@ class MessagesApi(Resource):
             socketio.emit('update', {}, room='chat' + str(chat.id))
 
             return { 'id': str(message.id) }, 200
+        except DoesNotExist:
+            raise DocumentMissing
+        except Exception as e:
+            raise InternalServerError
+
+
+class ChatActionsApi(Resource):
+    @jwt_required
+    def get(self, id):
+        try:
+            user_id = get_jwt_identity()
+            body = request.get_json()
+            chat = Chat.objects.get(id=id)
+
+            actions = [convert_ob(action) for action in chat.actions]
+
+            return Response(JSONEncoder().encode(actions), mimetype="application/json", status=200)
+        except DoesNotExist:
+            raise DocumentMissing
+        except Exception as e:
+            raise InternalServerError
+
+    @jwt_required
+    def post(self, id):
+        try:
+            user_id = get_jwt_identity()
+            body = request.get_json()
+            chat = Chat.objects.get(id=id)
+            user = User.objects.get(id=user_id)
+
+            action = ToDoAction(**body, author=user)
+            chat.actions.append(action)
+
+            action.save()
+            chat.save()
+
+            return { 'id': str(action.id) }, 200
+        except DoesNotExist:
+            raise DocumentMissing
+        except Exception as e:
+            raise InternalServerError
+
+
+class ChatActionApi(Resource):
+    @jwt_required
+    def patch(self, id, action_id):
+        try:
+            user_id = get_jwt_identity()
+            body = request.get_json()
+
+            ToDoAction.objects.get(id=action_id).update(**body)
+
+            return '', 200
+        except DoesNotExist:
+            raise DocumentMissing
+        except Exception as e:
+            raise InternalServerError
+
+    @jwt_required
+    def delete(self, id, action_id):
+        try:
+            user_id = get_jwt_identity()
+            chat = Chat.objects.get(id=id)
+            action = ToDoAction.objects.get(id=action_id)
+            chat.actions.remove(action)
+            chat.save()
+
+            action.delete()
+
+            return '', 200
         except DoesNotExist:
             raise DocumentMissing
         except Exception as e:
